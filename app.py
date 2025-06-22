@@ -1,3 +1,5 @@
+# Enhanced app.py with improvements
+
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from typing import Annotated, Dict, Any, Optional
@@ -17,8 +19,9 @@ from models import (
 )
 from datetime import datetime
 from PyPDF2 import PdfReader
+import re
 
-SIMILARITY_THRESHOLD = 0.9
+SIMILARITY_THRESHOLD = 0.85  # Lowered for better retrieval
 
 # Configure APIs
 load_dotenv()
@@ -26,10 +29,11 @@ api_key = os.getenv('GEMINI_API_KEY')
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
+# Set Tesseract path (adjust for your system)
+if os.name == 'nt':  # Windows
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
-#Graph structure
 class ChatState(TypedDict):
     session_id: str
     user_input: str
@@ -41,11 +45,16 @@ class ChatState(TypedDict):
     final_answer: str
     error_message: Optional[str]
 
+def preprocess_text(text):
+    """Clean and preprocess text for better embeddings"""
+    # Remove extra whitespace and normalize
+    text = re.sub(r'\s+', ' ', text.strip())
+    # Remove special characters that might interfere
+    text = re.sub(r'[^\w\s\.\,\?\!\-\(\)]', ' ', text)
+    return text
 
-# Node 1: Check Input Type
 def check_input_type(state: ChatState) -> ChatState:
     print("Checking input type...")
-    """Determine the type of input (text, image, audio)"""
     if state.get("file_data"):
         file_type = state["file_data"].get("type", "")
         if file_type.startswith('image/'):
@@ -58,7 +67,6 @@ def check_input_type(state: ChatState) -> ChatState:
             state["input_type"] = "text"
     else:
         state["input_type"] = "text"
-    
     return state
 
 def extract_text_from_pdf(state: ChatState) -> ChatState:
@@ -67,65 +75,86 @@ def extract_text_from_pdf(state: ChatState) -> ChatState:
         file_data = state["file_data"]
         reader = PdfReader(file_data["stream"])
         text = "\n".join(page.extract_text() or "" for page in reader.pages)
-        state["extracted_text"] = f"[PDF Content]: {text.strip() or 'No readable text found'}"
+        processed_text = preprocess_text(text)
+        state["extracted_text"] = f"[PDF Content]: {processed_text or 'No readable text found'}"
     except Exception as e:
         state["error_message"] = f"PDF processing error: {str(e)}"
         state["extracted_text"] = "[PDF Content]: Could not extract text."
     return state
 
-# Node 2: Extract Text from Image
 def extract_text_from_image(state: ChatState) -> ChatState:
     print("Extracting text from image...")
-    """Use OCR to extract text from image"""
     try:
         file_data = state["file_data"]
         image = Image.open(file_data["stream"])
-        extracted = pytesseract.image_to_string(image)
-        state["extracted_text"] = f"[Image Content]: {extracted.strip() or 'No readable text found'}"
+        
+        # Enhance image for better OCR
+        image = image.convert('L')  # Convert to grayscale
+        
+        # Use different OCR configurations for better results
+        custom_config = r'--oem 3 --psm 6'
+        extracted = pytesseract.image_to_string(image, config=custom_config)
+        
+        processed_text = preprocess_text(extracted)
+        state["extracted_text"] = f"[Image Content]: {processed_text or 'No readable text found'}"
+        
+        # If no text found, try with different PSM mode
+        if not processed_text:
+            custom_config = r'--oem 3 --psm 11'
+            extracted = pytesseract.image_to_string(image, config=custom_config)
+            processed_text = preprocess_text(extracted)
+            state["extracted_text"] = f"[Image Content]: {processed_text or 'No readable text found'}"
+            
     except Exception as e:
         state["error_message"] = f"Image processing error: {str(e)}"
         state["extracted_text"] = "[Image Content]: Could not extract text."
     return state
 
-
-# Node 3: Extract Text from Audio
 def extract_text_from_audio(state: ChatState) -> ChatState:
     print("Extracting text from audio...")
-    """Use speech recognition to extract text from audio"""
     try:
         recognizer = sr.Recognizer()
         file_data = state["file_data"]
+        
+        # Adjust for ambient noise
         with sr.AudioFile(file_data["stream"]) as source:
+            recognizer.adjust_for_ambient_noise(source)
             audio_data = recognizer.record(source)
-            text = recognizer.recognize_google(audio_data)
-            state["extracted_text"] = f"[Audio Content]: {text.strip()}"
+            
+        text = recognizer.recognize_google(audio_data)
+        processed_text = preprocess_text(text)
+        state["extracted_text"] = f"[Audio Content]: {processed_text}"
+        
+    except sr.UnknownValueError:
+        state["extracted_text"] = "[Audio Content]: Could not understand the audio."
+    except sr.RequestError as e:
+        state["error_message"] = f"Audio recognition service error: {str(e)}"
+        state["extracted_text"] = "[Audio Content]: Recognition service unavailable."
     except Exception as e:
         state["error_message"] = f"Audio processing error: {str(e)}"
         state["extracted_text"] = "[Audio Content]: Could not extract text."
     return state
 
-
-# Node 4: Embed Text
 def embed_text(state: ChatState) -> ChatState:
     print("Creating embedding for the text...")
-    """Create embedding for the text"""
     # Combine user input with extracted text if available
-    full_text = state["user_input"]
+    full_text = state["user_input"] or ""
     if state.get("extracted_text"):
-        full_text = f"{state['extracted_text']}\n{state['user_input']}" if state["user_input"] else state["extracted_text"]
+        full_text = f"{state['extracted_text']}\n{full_text}" if state["user_input"] else state["extracted_text"]
+    
+    # Preprocess the combined text
+    full_text = preprocess_text(full_text)
     
     try:
-        embedding = embedder.encode(state["user_input"] or state.get("extracted_text", ""))
-        state["embedding"] = embedding.tolist()
+        if full_text:
+            embedding = embedder.encode(full_text)
+            state["embedding"] = embedding.tolist()
     except Exception as e:
         state["error_message"] = f"Embedding error: {str(e)}"
     return state
 
-
-# Node 5: Check Cache
 def check_cache(state: ChatState) -> ChatState:
     print("Checking cache for similar questions...")
-    """Check if similar question exists in cache"""
     try:
         if state.get("embedding"):
             cached_answer = find_similar_question(
@@ -139,11 +168,8 @@ def check_cache(state: ChatState) -> ChatState:
         state["cached_answer"] = None
     return state
 
-
-# Node 6: Return Cached Answer
 def return_cached_answer(state: ChatState) -> ChatState:
     print("Returning cached answer...")
-    """Return the cached answer"""
     state["final_answer"] = state["cached_answer"]
     return state
 
@@ -153,7 +179,6 @@ from chromadb import PersistentClient
 chroma_client = PersistentClient(path="./rag_store")
 collection = chroma_client.get_or_create_collection("rag_documents")
 
-# Node 7: Generate New Answer
 def generate_answer(state: ChatState) -> ChatState:
     print("Generating new answer using Gemini + RAG...")
 
@@ -163,28 +188,55 @@ def generate_answer(state: ChatState) -> ChatState:
             save_session(state["session_id"], datetime.utcnow())
 
         # Get full input (extracted media + user text)
-        full_input = state["user_input"]
+        full_input = state["user_input"] or ""
         if state.get("extracted_text"):
-            full_input = f"{state['extracted_text']}\n{state['user_input']}" if state["user_input"] else state["extracted_text"]
+            full_input = f"{state['extracted_text']}\n{full_input}" if state["user_input"] else state["extracted_text"]
+
+        # Preprocess input
+        full_input = preprocess_text(full_input)
 
         # 1. Embed the user query
         query_embedding = embedder.encode(full_input).tolist()
 
-        # 2. Retrieve relevant chunks from ChromaDB
+        # 2. Retrieve relevant chunks from ChromaDB with increased results
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=3
+            n_results=5,  # Increased from 3 to 5 for better context
+            include=['documents', 'distances']  # Include similarity scores
         )
-        context_chunks = results['documents'][0]  # top 3 chunks
-        context_text = "\n\n".join(context_chunks)
+        
+        context_chunks = results['documents'][0] if results['documents'] else []
+        distances = results['distances'][0] if results['distances'] else []
+        
+        # Filter chunks based on relevance threshold
+        relevant_chunks = []
+        for chunk, distance in zip(context_chunks, distances):
+            if distance < 0.7:  # Only include reasonably similar chunks
+                relevant_chunks.append(chunk)
+        
+        if not relevant_chunks:
+            # If no relevant chunks found, use top 2 anyway
+            relevant_chunks = context_chunks[:2]
+        
+        context_text = "\n\n".join(relevant_chunks)
 
-        # 3. Compose the final RAG prompt
-        prompt = (
-            "You are a helpful assistant for CAT exam preparation.\n"
-            "Use the following study material to answer the user's question:\n\n"
-            f"{context_text}\n\n"
-            f"Question: {full_input}\n"
-        )
+        # 3. Enhanced prompt for better responses
+        prompt = f"""You are an expert chemistry tutor specializing in JEE preparation. 
+Use the following study material to provide a comprehensive answer to the student's question.
+
+Study Material:
+{context_text}
+
+Student's Question: {full_input}
+
+Instructions:
+- Provide a clear, detailed explanation
+- Include relevant formulas, equations, or concepts
+- If it's a problem, show step-by-step solution
+- Reference specific concepts from the study material when applicable
+- If the question is not chemistry-related or cannot be answered from the material, politely explain the limitation
+
+Answer:"""
 
         # 4. Generate answer from Gemini
         response = model.generate_content(prompt)
@@ -201,16 +253,14 @@ def generate_answer(state: ChatState) -> ChatState:
         state["final_answer"] = answer
 
     except Exception as e:
+        print(f"RAG error details: {str(e)}")
         state["error_message"] = f"RAG error: {str(e)}"
-        state["final_answer"] = "Sorry, an error occurred while generating your answer."
+        state["final_answer"] = "Sorry, an error occurred while generating your answer. Please try again."
 
     return state
 
-
-
-# Conditional edge functions
+# Conditional edge functions remain the same
 def route_after_input_check(state: ChatState) -> str:
-    """Route based on input type"""
     input_type = state.get("input_type", "text")
     if input_type == "image":
         return "extract_image"
@@ -222,14 +272,12 @@ def route_after_input_check(state: ChatState) -> str:
         return "embed_text"
 
 def route_after_cache_check(state: ChatState) -> str:
-    """Route based on cache result"""
     if state.get("cached_answer"):
         return "return_cached"
     else:
         return "generate_new"
 
-
-# Build the graph
+# Build the graph (same as before)
 def create_chat_workflow():
     workflow = StateGraph(ChatState)
     workflow.add_node("check_input", check_input_type)
@@ -267,17 +315,14 @@ def create_chat_workflow():
     workflow.add_edge("generate_new", END)
     return workflow.compile()
 
-
-# Flask integration
+# Flask integration remains the same
 from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 chat_workflow = create_chat_workflow()
 
-
 @app.route('/')
 def home():
     return render_template('index.html')
-
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -285,6 +330,7 @@ def chat():
     session_id = str(request.form.get('session_id'))
     uploaded_file = request.files.get('file')
     file_type = request.form.get('file_type')    
+    
     initial_state = {
         "session_id": session_id,
         "user_input": user_message,
@@ -296,12 +342,14 @@ def chat():
         "final_answer": "",
         "error_message": None
     }
+    
     if uploaded_file and file_type:
         initial_state["file_data"] = {
             "stream": uploaded_file.stream,
             "type": file_type,
             "name": uploaded_file.filename
         }
+    
     try:
         result = chat_workflow.invoke(initial_state)
         response_text = result.get("final_answer", "Sorry, I couldn't process your request.")
@@ -313,7 +361,6 @@ def chat():
     except Exception as e:
         print(f"Workflow execution error: {str(e)}")
         return jsonify({"response": "Sorry, there was an error processing your request."})
-
 
 if __name__ == '__main__':
     from models import clear_database    
