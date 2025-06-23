@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CAT Exam Preparation Assistant</title>
+    <title>JEE Exam Preparation Assistant</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -72,38 +72,131 @@
             margin-bottom: 20px;
         }
         .message {
-            margin: 10px 0;
-            padding: 10px;
-            border-radius: 5px;
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 12px;
             max-width: 80%;
+            line-height: 1.6;
+            font-size: 14px;
         }
         .user-message {
-            background-color: #e3f2fd;
+            background-color: #007bff;
+            color: white;
             margin-left: auto;
+            border-bottom-right-radius: 4px;
         }
         .bot-message {
-            background-color: #f5f5f5;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            color: #212529;
+            border-bottom-left-radius: 4px;
         }
+        
+        /* Enhanced formatting for bot messages */
+        .bot-message h1, .bot-message h2, .bot-message h3 {
+            color: #1a73e8;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        .bot-message h1 { font-size: 18px; }
+        .bot-message h2 { font-size: 16px; }
+        .bot-message h3 { font-size: 14px; }
+        
+        .bot-message strong {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        
+        .bot-message p {
+            margin: 10px 0;
+        }
+        
+        .bot-message ul, .bot-message ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .bot-message li {
+            margin: 5px 0;
+        }
+        
+        .bot-message code {
+            background-color: #f1f3f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: #d73a49;
+        }
+        
+        .bot-message pre {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            padding: 15px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 15px 0;
+        }
+        
+        .bot-message blockquote {
+            border-left: 4px solid #1a73e8;
+            margin: 15px 0;
+            padding-left: 15px;
+            font-style: italic;
+            background-color: #f0f8ff;
+            padding: 10px 15px;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        /* User message formatting */
+        .user-message p {
+            margin: 8px 0;
+        }
+        
+        .user-message br {
+            margin: 5px 0;
+        }
+
         .input-container {
             display: flex;
+            flex-direction: column;
             gap: 10px;
-            align-items: center;
             border: 1px solid #e0e0e0;
-            border-radius: 25px;
-            padding: 8px 15px;
+            border-radius: 12px;
+            padding: 15px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
             margin-top: 20px;
             background-color: white;
         }
+        
+        .input-area {
+            display: flex;
+            align-items: flex-end;
+            gap: 10px;
+        }
+        
         #user-input {
             flex: 1;
-            padding: 10px;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
             outline: none;
-            background-color: transparent;
+            resize: vertical;
+            min-height: 40px;
+            max-height: 120px;
+            font-family: inherit;
+            line-height: 1.4;
         }
+        
+        .input-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
         button {
             padding: 0;
             background-color: transparent;
@@ -111,7 +204,7 @@
             border: none;
             border-radius: 50%;
             cursor: pointer;
-            font-size: 24px;
+            font-size: 20px;
             width: 40px;
             height: 40px;
             display: flex;
@@ -125,7 +218,7 @@
         button[onclick="sendMessage()"] {
             background-color: #1a73e8;
             color: white;
-            font-size: 20px;
+            font-size: 16px;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -171,6 +264,58 @@
             line-height: 1;
             padding: 0;
         }
+
+        /* Styles for file preview in chat messages */
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            background-color: rgba(255,255,255,0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+        }
+        .file-info {
+            flex: 1;
+        }
+        .file-name {
+            font-weight: bold;
+            color: inherit;
+        }
+        .file-type {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        /* Math formula styling */
+        .math-formula {
+            background-color: #f0f8ff;
+            border: 1px solid #cce7ff;
+            border-radius: 6px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: 'Times New Roman', serif;
+            text-align: center;
+        }
+        
+        /* Step-by-step solution styling */
+        .solution-step {
+            background-color: #f9f9f9;
+            border-left: 4px solid #28a745;
+            padding: 10px 15px;
+            margin: 10px 0;
+            border-radius: 0 6px 6px 0;
+        }
+        
+        .solution-step .step-number {
+            font-weight: bold;
+            color: #28a745;
+        }
     </style>
 </head>
 <body>
@@ -183,24 +328,38 @@
     <div class="main-content">
         <div class="chat-container">
             <div class="chat-header">
-                <h1>CAT Exam Preparation Assistant</h1>
+                <h1>JEE Exam Preparation Assistant</h1>
             </div>
             <div class="chat-messages" id="chat-messages">
                 <div class="message bot-message">
-                    Hello! I'm your CAT exam preparation assistant. How can I help you today?
+                    <p><strong>Hello! I'm your JEE exam preparation assistant.</strong></p>
+                    <p>I can help you with:</p>
+                    <ul>
+                        <li><strong>Chemistry problems</strong> - step-by-step solutions</li>
+                        <li><strong>Formula explanations</strong> - with clear derivations</li>
+                        <li><strong>Image analysis</strong> - upload problem images</li>
+                        <li><strong>Audio questions</strong> - speak your questions</li>
+                        <li><strong>PDF documents</strong> - extract and solve problems</li>
+                    </ul>
+                    <p>How can I help you today?</p>
                 </div>
             </div>
             <div id="image-preview" class="image-preview-container" style="display: none;">
                 <img id="preview-image" src="" alt="Image Preview">
                 <span id="preview-filename"></span>
-                <button class="close-preview" onclick="clearImagePreview()">X</button>
+                <button class="close-preview" onclick="clearImagePreview()">×</button>
             </div>
             <div class="input-container">
-                <input type="text" id="user-input" placeholder="Type your question here...">
-                <button onclick="document.getElementById('media-input').click()">+</button>
-                <input type="file" id="media-input" accept="image/*,audio/*,application/pdf" style="display: none;">
-                <button id="mic-button" onclick="toggleRecording()">🎤</button>
-                <button onclick="sendMessage()">➤</button>
+                <div class="input-area">
+                    <textarea id="user-input" placeholder="Type your question here... (Shift+Enter for new line)"></textarea>
+                    <button onclick="document.getElementById('media-input').click()" title="Upload file">📎</button>
+                    <input type="file" id="media-input" accept="image/*,audio/*,application/pdf" style="display: none;">
+                    <button id="mic-button" onclick="toggleRecording()" title="Voice input">🎤</button>
+                    <button onclick="sendMessage()" title="Send message">➤</button>
+                </div>
+                <div class="input-hint">
+                    Press <strong>Shift+Enter</strong> for new line, <strong>Enter</strong> to send
+                </div>
             </div>
         </div>
     </div>
@@ -210,11 +369,9 @@
         let chatHistory = [];
 
         // Image preview elements
-        const imageInput = document.getElementById('image-input');
         const imagePreviewContainer = document.getElementById('image-preview');
         const previewImage = document.getElementById('preview-image');
         const previewFilename = document.getElementById('preview-filename');
-
         const mediaInput = document.getElementById('media-input');
 
         mediaInput.addEventListener('change', function () {
@@ -235,11 +392,11 @@
                 };
                 reader.readAsDataURL(file);
             } else if (isAudio) {
-                previewImage.src = 'https://cdn-icons-png.flaticon.com/512/727/727269.png'; // Audio icon
+                previewImage.src = 'https://cdn-icons-png.flaticon.com/512/727/727269.png';
                 previewFilename.textContent = file.name;
                 imagePreviewContainer.style.display = 'flex';
             } else if (isPDF) {
-                previewImage.src = 'https://cdn-icons-png.flaticon.com/512/337/337946.png'; // PDF icon
+                previewImage.src = 'https://cdn-icons-png.flaticon.com/512/337/337946.png';
                 previewFilename.textContent = file.name;
                 imagePreviewContainer.style.display = 'flex';
             } else {
@@ -249,26 +406,32 @@
             }
         });
 
-
         function clearImagePreview() {
-            console.log('Clearing image preview.');
-            mediaInput.value = ''; // Clear the selected file
+            mediaInput.value = '';
             previewImage.src = '';
             previewFilename.textContent = '';
             imagePreviewContainer.style.display = 'none';
         }
 
         function startNewChat() {
-            // Save current chat to history if it exists
             if (document.getElementById('chat-messages').children.length > 1) {
                 saveCurrentChat();
             }
             
-            // Clear current chat
             const messagesDiv = document.getElementById('chat-messages');
-            messagesDiv.innerHTML = '<div class="message bot-message">Hello! I\'m your CAT exam preparation assistant. How can I help you today?</div>';
+            messagesDiv.innerHTML = `<div class="message bot-message">
+                <p><strong>Hello! I'm your JEE exam preparation assistant.</strong></p>
+                <p>I can help you with:</p>
+                <ul>
+                    <li><strong>Chemistry problems</strong> - step-by-step solutions</li>
+                    <li><strong>Formula explanations</strong> - with clear derivations</li>
+                    <li><strong>Image analysis</strong> - upload problem images</li>
+                    <li><strong>Audio questions</strong> - speak your questions</li>
+                    <li><strong>PDF documents</strong> - extract and solve problems</li>
+                </ul>
+                <p>How can I help you today?</p>
+            </div>`;
             
-            // Generate new chat ID
             currentChatId = Date.now();
         }
 
@@ -280,18 +443,15 @@
                 id: currentChatId,
                 title: chatTitle,
                 messages: Array.from(messages).map(msg => ({
-                    content: msg.classList.contains('user-message') ? msg.textContent : msg.innerHTML,
+                    content: msg.innerHTML,
                     isUser: msg.classList.contains('user-message')
                 }))
             };
             
-            // Check if chat with same ID already exists
             const existingChatIndex = chatHistory.findIndex(chat => chat.id === currentChatId);
             if (existingChatIndex !== -1) {
-                // Update existing chat
                 chatHistory[existingChatIndex] = chatData;
             } else {
-                // Add new chat
                 chatHistory.push(chatData);
             }
             updateChatHistory();
@@ -311,7 +471,6 @@
         }
 
         function loadChat(chat) {
-            // Save current chat before switching
             if (document.getElementById('chat-messages').children.length > 1) {
                 saveCurrentChat();
             }
@@ -322,22 +481,70 @@
             chat.messages.forEach(msg => {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-                if (msg.isUser) {
-                    messageDiv.textContent = msg.content;
-                } else {
-                    messageDiv.innerHTML = msg.content;
-                }
+                messageDiv.innerHTML = msg.content;
                 messagesDiv.appendChild(messageDiv);
             });
             
             currentChatId = chat.id;
         }
 
+        function formatBotResponse(text) {
+            // Enhanced formatting for bot responses
+            let formatted = text;
+            
+            // Format headers
+            formatted = formatted.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+            formatted = formatted.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+            formatted = formatted.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+            
+            // Format bold text
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Format code blocks
+            formatted = formatted.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+            formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+            
+            // Format lists
+            formatted = formatted.replace(/^\* (.*$)/gm, '<li>$1</li>');
+            formatted = formatted.replace(/^(\d+)\. (.*$)/gm, '<li>$1. $2</li>');
+            
+            // Wrap consecutive list items in ul tags
+            formatted = formatted.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+            formatted = formatted.replace(/<\/ul>\s*<ul>/g, '');
+            
+            // Format step-by-step solutions
+            formatted = formatted.replace(/^Step (\d+):(.*$)/gm, '<div class="solution-step"><span class="step-number">Step $1:</span>$2</div>');
+            
+            // Format mathematical expressions (basic)
+            formatted = formatted.replace(/\$\$(.*?)\$\$/g, '<div class="math-formula">$1</div>');
+            formatted = formatted.replace(/\$([^$]+)\$/g, '<span class="math-formula" style="display: inline-block; padding: 2px 6px;">$1</span>');
+            
+            // Format line breaks
+            formatted = formatted.replace(/\n\n/g, '</p><p>');
+            formatted = formatted.replace(/\n/g, '<br>');
+            
+            // Wrap in paragraphs if not already wrapped
+            if (!formatted.includes('<p>') && !formatted.includes('<h') && !formatted.includes('<ul>') && !formatted.includes('<div>')) {
+                formatted = '<p>' + formatted + '</p>';
+            }
+            
+            return formatted;
+        }
+
         function addMessage(message, isUser) {
             const messagesDiv = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            messageDiv.innerHTML = message.replace(/\n/g, '<br>');
+            
+            if (isUser) {
+                // For user messages, preserve line breaks and basic formatting
+                messageDiv.innerHTML = message.replace(/\n/g, '<br>');
+            } else {
+                // For bot messages, apply enhanced formatting
+                messageDiv.innerHTML = formatBotResponse(message);
+            }
+            
             messagesDiv.appendChild(messageDiv);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
@@ -348,31 +555,48 @@
             const file = mediaInput.files[0];
 
             if (!message && !file) {
-                return; // Don't send empty messages
+                return;
             }
 
-            // Display combined content in chat immediately and synchronously
+            // Display user message with proper formatting
             let userMessageHtml = '';
             if (file && file.type.startsWith("image/")) {
                 userMessageHtml = `<img src="${previewImage.src}" alt="Uploaded Image" style="max-width:200px; border-radius:8px; display: block; margin-bottom: 10px;">`;
                 if (message) {
-                    userMessageHtml += `<p>${message}</p>`;
+                    userMessageHtml += `<p>${message.replace(/\n/g, '<br>')}</p>`;
                 }
             } else if (file && file.type.startsWith("audio/")) {
-                userMessageHtml = `<p>🎧 ${file.name}</p>`;
+                userMessageHtml = `
+                    <div class="file-preview">
+                        <img src="https://cdn-icons-png.flaticon.com/512/727/727269.png" alt="Audio" class="file-icon">
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-type">Audio file</div>
+                        </div>
+                    </div>`;
                 if (message) {
-                    userMessageHtml += `<p>${message}</p>`;
+                    userMessageHtml += `<p>${message.replace(/\n/g, '<br>')}</p>`;
+                }
+            } else if (file && file.type === "application/pdf") {
+                userMessageHtml = `
+                    <div class="file-preview">
+                        <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" alt="PDF" class="file-icon">
+                        <div class="file-info">
+                            <div class="file-name">${file.name}</div>
+                            <div class="file-type">PDF document</div>
+                        </div>
+                    </div>`;
+                if (message) {
+                    userMessageHtml += `<p>${message.replace(/\n/g, '<br>')}</p>`;
                 }
             } else if (message) {
                 userMessageHtml = message;
             }
 
-
             if (userMessageHtml) {
-                addMessage(userMessageHtml, true); // Display combined content as user message
+                addMessage(userMessageHtml, true);
             }
             
-            // Clear input and preview immediately
             input.value = '';
             clearImagePreview();
 
@@ -399,42 +623,18 @@
             }
         }
 
-        async function uploadImage() {
-            // This function is now only responsible for handling the manual upload process via the + button
-            // The image processing and sending is now handled by sendMessage()
-            // No changes needed here, as the event listener now directly calls this once file is chosen
-        }
+        // Enhanced input handling
+        document.getElementById('user-input').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
 
-        async function uploadAudio() {
-            const audioInput = document.getElementById('audio-input');
-            if (!audioInput.files[0]) return;
-
-            const file = audioInput.files[0];
-            const formData = new FormData();
-            formData.append('audio', file);
-            formData.append('session_id', currentChatId);
-
-            // Show file name or microphone icon in chat
-            const voiceIcon = `<span>🎤 ${file.name}</span>`;
-            addMessage(voiceIcon, true);
-
-            const response = await fetch('/upload-audio', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-            addMessage(data.response, false);
-        }
-
-        function startRecording() {
-            const audioInput = document.getElementById('audio-input');
-            audioInput.click();
-            audioInput.addEventListener('change', uploadAudio);
-        }
-
-        document.getElementById('user-input').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') sendMessage();
+        // Auto-resize textarea
+        document.getElementById('user-input').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
         let isRecording = false;
@@ -450,11 +650,13 @@
                 recognition.onstart = function() {
                     isRecording = true;
                     document.getElementById('mic-button').style.backgroundColor = '#ff4444';
+                    document.getElementById('mic-button').style.color = 'white';
                 };
 
                 recognition.onend = function() {
                     isRecording = false;
                     document.getElementById('mic-button').style.backgroundColor = '';
+                    document.getElementById('mic-button').style.color = '#5f6368';
                 };
 
                 recognition.onresult = function(event) {
@@ -463,12 +665,14 @@
                         .join('');
                     
                     document.getElementById('user-input').value = transcript;
+                    document.getElementById('user-input').dispatchEvent(new Event('input'));
                 };
 
                 recognition.onerror = function(event) {
                     console.error('Speech recognition error:', event.error);
                     isRecording = false;
                     document.getElementById('mic-button').style.backgroundColor = '';
+                    document.getElementById('mic-button').style.color = '#5f6368';
                 };
             } else {
                 alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
@@ -477,7 +681,7 @@
 
         function toggleRecording() {
             if (!recognition) {
-                initSpeechRecognition();
+                initSpeechRecording();
             }
 
             if (isRecording) {
@@ -493,4 +697,4 @@
         };
     </script>
 </body>
-</html> 
+</html>
