@@ -1,5 +1,3 @@
-# Enhanced app.py with improvements
-
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from typing import Annotated, Dict, Any, Optional
@@ -21,17 +19,15 @@ from datetime import datetime
 from PyPDF2 import PdfReader
 import re
 
-SIMILARITY_THRESHOLD = 0.85  # Lowered for better retrieval
+SIMILARITY_THRESHOLD = 0.85  
 
-# Configure APIs
 load_dotenv()
 api_key = os.getenv('GEMINI_API_KEY')
 genai.configure(api_key=api_key)
 model = genai.GenerativeModel('gemini-2.5-flash-preview-04-17')
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
-# Set Tesseract path (adjust for your system)
-if os.name == 'nt':  # Windows
+if os.name == 'nt':  
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 class ChatState(TypedDict):
@@ -47,9 +43,7 @@ class ChatState(TypedDict):
 
 def preprocess_text(text):
     """Clean and preprocess text for better embeddings"""
-    # Remove extra whitespace and normalize
     text = re.sub(r'\s+', ' ', text.strip())
-    # Remove special characters that might interfere
     text = re.sub(r'[^\w\s\.\,\?\!\-\(\)]', ' ', text)
     return text
 
@@ -88,17 +82,14 @@ def extract_text_from_image(state: ChatState) -> ChatState:
         file_data = state["file_data"]
         image = Image.open(file_data["stream"])
         
-        # Enhance image for better OCR
-        image = image.convert('L')  # Convert to grayscale
+        image = image.convert('L')  
         
-        # Use different OCR configurations for better results
         custom_config = r'--oem 3 --psm 6'
         extracted = pytesseract.image_to_string(image, config=custom_config)
         
         processed_text = preprocess_text(extracted)
         state["extracted_text"] = f"[Image Content]: {processed_text or 'No readable text found'}"
         
-        # If no text found, try with different PSM mode
         if not processed_text:
             custom_config = r'--oem 3 --psm 11'
             extracted = pytesseract.image_to_string(image, config=custom_config)
@@ -137,12 +128,10 @@ def extract_text_from_audio(state: ChatState) -> ChatState:
 
 def embed_text(state: ChatState) -> ChatState:
     print("Creating embedding for the text...")
-    # Combine user input with extracted text if available
     full_text = state["user_input"] or ""
     if state.get("extracted_text"):
         full_text = f"{state['extracted_text']}\n{full_text}" if state["user_input"] else state["extracted_text"]
     
-    # Preprocess the combined text
     full_text = preprocess_text(full_text)
     
     try:
@@ -175,7 +164,6 @@ def return_cached_answer(state: ChatState) -> ChatState:
 
 from chromadb import PersistentClient
 
-# Set up Chroma client (reusable across requests)
 chroma_client = PersistentClient(path="./rag_store")
 collection = chroma_client.get_or_create_collection("rag_documents")
 
@@ -183,66 +171,57 @@ def generate_answer(state: ChatState) -> ChatState:
     print("Generating new answer using Gemini + RAG...")
 
     try:
-        # Save session if it's new
         if not session_exists(state["session_id"]):
             save_session(state["session_id"], datetime.utcnow())
 
-        # Get full input (extracted media + user text)
         full_input = state["user_input"] or ""
         if state.get("extracted_text"):
             full_input = f"{state['extracted_text']}\n{full_input}" if state["user_input"] else state["extracted_text"]
 
-        # Preprocess input
         full_input = preprocess_text(full_input)
 
-        # 1. Embed the user query
         query_embedding = embedder.encode(full_input).tolist()
 
-        # 2. Retrieve relevant chunks from ChromaDB with increased results
         results = collection.query(
             query_embeddings=[query_embedding],
-            n_results=5,  # Increased from 3 to 5 for better context
-            include=['documents', 'distances']  # Include similarity scores
+            n_results=5,  
+            include=['documents', 'distances']  
         )
         
         context_chunks = results['documents'][0] if results['documents'] else []
         distances = results['distances'][0] if results['distances'] else []
         
-        # Filter chunks based on relevance threshold
         relevant_chunks = []
         for chunk, distance in zip(context_chunks, distances):
-            if distance < 0.7:  # Only include reasonably similar chunks
+            if distance < 0.7: 
                 relevant_chunks.append(chunk)
         
         if not relevant_chunks:
-            # If no relevant chunks found, use top 2 anyway
             relevant_chunks = context_chunks[:2]
         
         context_text = "\n\n".join(relevant_chunks)
+        print(context_text)  
 
-        # 3. Enhanced prompt for better responses
         prompt = f"""You are an expert chemistry tutor specializing in JEE preparation. 
-Use the following study material to provide a comprehensive answer to the student's question.
+                Use the following study material to provide a comprehensive answer to the student's question.
 
-Study Material:
-{context_text}
+                Study Material:
+                {context_text}
 
-Student's Question: {full_input}
+                Student's Question: {full_input}
 
-Instructions:
-- Provide a clear, detailed explanation
-- Include relevant formulas, equations, or concepts
-- If it's a problem, show step-by-step solution
-- Reference specific concepts from the study material when applicable
-- If the question is not chemistry-related or cannot be answered from the material, politely explain the limitation
+                Instructions:
+                - Provide a clear, detailed explanation
+                - Include relevant formulas, equations, or concepts
+                - If it's a problem, show step-by-step solution
+                - Reference specific concepts from the study material when applicable
+                - If the question is not chemistry-related or cannot be answered from the material, politely explain the limitation
 
-Answer:"""
+                Answer:"""
 
-        # 4. Generate answer from Gemini
         response = model.generate_content(prompt)
         answer = response.text
 
-        # 5. Save to user question history
         save_user_question(
             state["session_id"],
             full_input,
@@ -259,7 +238,6 @@ Answer:"""
 
     return state
 
-# Conditional edge functions remain the same
 def route_after_input_check(state: ChatState) -> str:
     input_type = state.get("input_type", "text")
     if input_type == "image":
@@ -277,7 +255,6 @@ def route_after_cache_check(state: ChatState) -> str:
     else:
         return "generate_new"
 
-# Build the graph (same as before)
 def create_chat_workflow():
     workflow = StateGraph(ChatState)
     workflow.add_node("check_input", check_input_type)
@@ -315,7 +292,6 @@ def create_chat_workflow():
     workflow.add_edge("generate_new", END)
     return workflow.compile()
 
-# Flask integration remains the same
 from flask import Flask, render_template, request, jsonify
 app = Flask(__name__)
 chat_workflow = create_chat_workflow()
