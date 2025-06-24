@@ -122,6 +122,21 @@ def find_similar_question(session_id,question_embedding, threshold):
     session.close()
     return None
 
+from sqlite3 import connect
+
+def get_last_n_messages(session_id: str, n: int = 10) -> list[tuple[str, str]]:
+    session = Session()
+    messages = (
+        session.query(UserQuestion)
+        .filter_by(session_id=session_id)
+        .order_by(UserQuestion.id.desc())
+        .limit(n)
+        .all()
+    )
+    session.close()
+    return list(reversed([(msg.question, msg.answer) for msg in messages]))
+
+
     
 def clear_database():
     Base.metadata.drop_all(engine)
