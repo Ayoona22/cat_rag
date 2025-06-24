@@ -13,7 +13,8 @@ from models import (
     save_user_question,
     find_similar_question,
     save_session,
-    session_exists
+    session_exists,
+    get_last_n_messages
 )
 from datetime import datetime
 from PyPDF2 import PdfReader
@@ -40,6 +41,7 @@ class ChatState(TypedDict):
     cached_answer: Optional[str]
     final_answer: str
     error_message: Optional[str]
+    user_preference: Optional[str]
 
 def preprocess_text(text):
     """Clean and preprocess text for better embeddings"""
@@ -176,7 +178,7 @@ def generate_answer(state: ChatState) -> ChatState:
 
         full_input = state["user_input"] or ""
         if state.get("extracted_text"):
-            full_input = f"{state['extracted_text']}\n{full_input}" if state["user_input"] else state["extracted_text"]
+            full_input = f"{state['extracted_text']}\n{full_input}" if full_input else state["extracted_text"]
 
         full_input = preprocess_text(full_input)
 
@@ -201,23 +203,32 @@ def generate_answer(state: ChatState) -> ChatState:
         
         context_text = "\n\n".join(relevant_chunks)
         print(context_text)  
+        
+
+        instruction_text = (
+            "- Just give the final answer, no explanation."
+            if state.get("user_preference") == "short"
+            else """- Provide a clear, detailed explanation.
+        - Include relevant formulas, equations, or concepts.
+        - If it's a problem, show step-by-step solution.
+        - Reference specific concepts from the study material when applicable.
+        - If the question is not chemistry-related or cannot be answered from the material, politely explain the limitation."""
+        )
 
         prompt = f"""You are an expert chemistry tutor specializing in JEE preparation. 
-                Use the following study material to provide a comprehensive answer to the student's question.
+        Use the following study material to answer the student's question.
 
-                Study Material:
-                {context_text}
+        Study Material:
+        {context_text}
 
-                Student's Question: {full_input}
+        Student's Question:
+        {full_input}
 
-                Instructions:
-                - Provide a clear, detailed explanation
-                - Include relevant formulas, equations, or concepts
-                - If it's a problem, show step-by-step solution
-                - Reference specific concepts from the study material when applicable
-                - If the question is not chemistry-related or cannot be answered from the material, politely explain the limitation
+        Instructions:
+        {instruction_text}
 
-                Answer:"""
+        Answer:"""
+
 
         response = model.generate_content(prompt)
         answer = response.text
@@ -262,8 +273,8 @@ def create_chat_workflow():
     workflow.add_node("extract_audio", extract_text_from_audio)
     workflow.add_node("extract_pdf", extract_text_from_pdf)
     workflow.add_node("embed_text", embed_text)
-    workflow.add_node("check_cache", check_cache)
-    workflow.add_node("return_cached", return_cached_answer)
+    # workflow.add_node("check_cache", check_cache)
+    # workflow.add_node("return_cached", return_cached_answer)
     workflow.add_node("generate_new", generate_answer)
     workflow.set_entry_point("check_input")    
     workflow.add_conditional_edges(
@@ -279,16 +290,17 @@ def create_chat_workflow():
     workflow.add_edge("extract_image", "embed_text")
     workflow.add_edge("extract_audio", "embed_text")
     workflow.add_edge("extract_pdf", "embed_text")
-    workflow.add_edge("embed_text", "check_cache")
-    workflow.add_conditional_edges(
-        "check_cache",
-        route_after_cache_check,
-        {
-            "return_cached": "return_cached",
-            "generate_new": "generate_new"
-        }
-    )
-    workflow.add_edge("return_cached", END)
+    # workflow.add_edge("embed_text", "check_cache")
+    # workflow.add_conditional_edges(
+    #     "check_cache",
+    #     route_after_cache_check,
+    #     {
+    #         "return_cached": "return_cached",
+    #         "generate_new": "generate_new"
+    #     }
+    # )
+    workflow.add_edge("embed_text", "generate_new")
+    # workflow.add_edge("return_cached", END)
     workflow.add_edge("generate_new", END)
     return workflow.compile()
 
@@ -325,8 +337,21 @@ def chat():
             "type": file_type,
             "name": uploaded_file.filename
         }
+    if "answer only" in user_message.lower():
+        initial_state["user_preference"] = "short"
+    else:
+        initial_state["user_preference"] = "detailed"
+
     
     try:
+        history = get_last_n_messages(session_id, 10)
+        conversation_context = ""
+        for idx, (q, a) in enumerate(history):
+            conversation_context += f"User: {q}\nBot: {a}\n"
+
+        # Merge history with current user input
+        conversation_input = f"{conversation_context}User: {user_message}"
+        initial_state["user_input"] = conversation_input
         result = chat_workflow.invoke(initial_state)
         response_text = result.get("final_answer", "Sorry, I couldn't process your request.")
         
