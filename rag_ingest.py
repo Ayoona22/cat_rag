@@ -6,6 +6,11 @@ from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 from chromadb import PersistentClient
+import fitz  # PyMuPDF
+from PIL import Image
+import pytesseract
+import io
+import base64
 
 from typing_extensions import TypedDict
 from typing import Optional
@@ -17,15 +22,52 @@ class IngestState(TypedDict):
     cleaned_text: Optional[str]
     chunks: Optional[list[str]]
     error: Optional[str]
+    image_data: Optional[list[dict]]
 
 def load_pdf_node(state: IngestState) -> IngestState:
     try:
-        reader = PdfReader(state["file_path"])
-        text_parts = [
-            f"[Page {i+1}] {page.extract_text() or ''}"
-            for i, page in enumerate(reader.pages)
-        ]
-        state["raw_text"] = "\n".join(text_parts)
+        doc = fitz.open(state["file_path"])
+        full_text = []
+        image_refs = []
+
+        for page_num, page in enumerate(doc, start=1):
+            text = page.get_text()
+            full_text.append(f"[Page {page_num}] {text.strip()}")
+
+            # Extract images from page
+            images = page.get_images(full=True)
+            for img_index, img in enumerate(images):
+                xref = img[0]
+                base_image = doc.extract_image(xref)
+                image_bytes = base_image["image"]
+                image_ext = base_image["ext"]
+
+                # OCR the image to capture any embedded text (like equations)
+                try:
+                    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+                    ocr_text = pytesseract.image_to_string(image).strip()
+                except Exception as ocr_err:
+                    ocr_text = ""
+
+                # Save image as base64 (optional – you can store or skip)
+                encoded_img = base64.b64encode(image_bytes).decode("utf-8")
+
+                # Append OCR text + a tag to insert image metadata
+                if ocr_text:
+                    full_text.append(f"\n[Image_OCR_Page_{page_num}_{img_index}]: {ocr_text}\n")
+
+                image_refs.append({
+                    "page": page_num,
+                    "index": img_index,
+                    "ocr_text": ocr_text,
+                    "image_format": image_ext,
+                    "base64_data": encoded_img
+                })
+
+        # Final state update
+        state["raw_text"] = "\n".join(full_text)
+        state["image_data"] = image_refs  # Optional: add this to IngestState if needed
+
     except Exception as e:
         state["error"] = f"PDF read error: {str(e)}"
     return state
@@ -147,9 +189,11 @@ if __name__ == "__main__":
         }
 
         final_state = graph.invoke(initial_state)
-        if final_state["error"]:
-            print(f"❌ Failed: {final_state['error']}")
-        else:
-            print(f"✅ Done: {file}")
+        if not final_state["error"]:
+            output_path = f"outputs/{file}.txt"
+            os.makedirs("outputs", exist_ok=True)
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(final_state["raw_text"] or "")
+            print(f"✅ Text saved to: {output_path}")
 
     
